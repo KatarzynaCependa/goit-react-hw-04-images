@@ -1,70 +1,62 @@
-import { Component } from 'react';
 import { searchApi } from './services/searchApi';
 import { Searchbar } from 'components/Searchbar/Searchbar';
 import { ImageGallery } from 'components/ImageGallery/ImageGallery';
 import { Loader } from 'components/Loader/Loader';
 import { Modal } from 'components/Modal/Modal';
 import { Button } from 'components/Button/Button';
+import { useEffect, useState } from 'react';
 
-export class App extends Component {
-  state = {
-    photos: [],
-    isLoading: false,
-    error: null,
-    searchValue: '',
-    page: 1,
-  };
+export const App = () => {
+  const [photos, setPhotos] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [modal, setModal] = useState('');
+  const [searchValue, setSearchValue] = useState('');
+  const [page, setPage] = useState(1);
 
-  async componentDidUpdate(prevState, prevProps) {
-    if (
-      // sprawdzenie czy wartość wyszukiwania lub strona wyników zostały zmienione w porównaniu do poprzednich propsów (prevState i prevProps)
-      this.state.searchValue !== prevProps.searchValue ||
-      this.state.page !== prevProps.page
-    ) {
+  useEffect(() => {
+    const asyncFunction = async () => {
       try {
         // ustawia flagę "isLoading" na true, oznaczając rozpoczęcie procesu ładowania
-        this.setState({ isLoading: true });
+        setIsLoading(true);
         // przyjęcie 2 parametrów (wartość wyszukiwania i numer strony)
-        const photos = await searchApi(this.state.searchValue, this.state.page);
+        const photos = await searchApi(searchValue, page);
 
-        photos.map(photo => {
-          return this.setState(prevState => ({
-            photos: [
-              // spread operator - istniejące zdjęcia w stanie komponentu są zachowane, a nowe zdjęcie jest dodawane jako ostatni element tablicy
-              ...prevState.photos,
-              {
-                id: photo.id,
-                webformatURL: photo.webformatURL,
-                largeImageURL: photo.largeImageURL,
-                tags: photo.tags,
-              },
-            ],
-          }));
+        const searchedPhotos = photos.map(photo => {
+          return {
+            id: photo.id,
+            webformatURL: photo.webformatURL,
+            largeImageURL: photo.largeImageURL,
+            tags: photo.tags,
+          };
         });
+
+        // jeśli searchValue nie jest pusty to wykonywana jest funkcja setPhotos
+        // która przyjmuje funkcję zwrotną jako argument, do starej tablicy dołączamy nową
+        // za pomocą spread operatora
+        searchValue !== '' && setPhotos(photo => [...photo, ...searchedPhotos]);
       } catch (error) {
-        this.setState({ error });
+        console.log(error);
       } finally {
         // ustawia flagę "isLoading" na false, oznaczając zakończenie procesu ładowania
-        this.setState({ isLoading: false });
+        setIsLoading(false);
       }
-    }
-  }
+    };
+    asyncFunction();
+  }, [searchValue, page]);
 
-  searchValue = e => this.setState({ photos: [], searchValue: e });
-
-  // zwraca aktualną tablicę zdjęć znajdujących się w stanie komponentu
-  showPhotos = () => {
-    const { photos } = this.state;
-    return photos;
+  const searchInputValue = e => {
+    setPhotos([]);
+    setPage(1);
+    setSearchValue(e);
   };
 
-  handleButtonVisibility = () => {
-    if (this.state.photos.length < 12) return 'none';
+  const handleButtonVisibility = () => {
+    if (photos.length < 12) return 'none';
   };
 
-  loadMore = e => {
+  const loadMore = e => {
     if (e) {
-      this.setState({ page: this.state.page + 1 });
+      setPage(page + 1);
 
       setTimeout(() => {
         window.scrollTo({
@@ -75,34 +67,24 @@ export class App extends Component {
     }
   };
 
-  handleModal = imageAddress => this.setState({ modal: imageAddress });
+  const handleModal = imageAddress => setModal(imageAddress);
 
-  modalClose = e => this.setState({ modal: e });
+  const modalClose = e => setModal(e);
 
-  passImgToModal = () => this.state.modal;
+  const passImgToModal = () => modal;
 
-  render() {
-    return (
-      <>
-        <Searchbar onSubmit={this.searchValue} />
-        <ImageGallery
-          photos={this.showPhotos()}
-          imageAddress={this.handleModal}
-        />
-        {this.state.isLoading && <Loader />}
-        <div
-          className="ButtonContainer"
-          style={{ display: this.handleButtonVisibility() }}
-        >
-          {!this.state.isLoading && <Button onClick={this.loadMore} />}
-        </div>
-        {this.state.modal && (
-          <Modal
-            imageAddress={this.passImgToModal()}
-            onClick={this.modalClose}
-          />
-        )}
-      </>
-    );
-  }
-}
+  return (
+    <>
+      <Searchbar onSubmit={searchInputValue} />
+      <ImageGallery photos={photos} imageAddress={handleModal} />
+      {isLoading && <Loader />}
+      <div
+        className="ButtonContainer"
+        style={{ display: handleButtonVisibility() }}
+      >
+        {!isLoading && <Button onClick={loadMore} />}
+      </div>
+      {modal && <Modal imageAddress={passImgToModal()} onClick={modalClose} />}
+    </>
+  );
+};
